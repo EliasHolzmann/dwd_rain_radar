@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "coordinates_mapper",
+    "rain_radar_values",
+]

@@ -1,0 +1,12 @@
+[package]
+name = "rain_radar_values"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.57"
+bzip2 = "0.4.3"
+chrono = { version = "0.4" }
+tar = "0.4.38"
