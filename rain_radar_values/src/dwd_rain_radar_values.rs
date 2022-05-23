@@ -287,7 +287,8 @@ mod test {
         let dwd_rain_radar_values = DWDRainRadarValues::from_file(format!(
             "{}/test_values/{}.tar.bz2",
             std::env::var("CARGO_MANIFEST_DIR")
-                .context("Failed getting manifest dir env variable")?, "valid"
+                .context("Failed getting manifest dir env variable")?,
+            "valid"
         ))?;
 
         assert_eq!(dwd_rain_radar_values.available_times().count(), 25);
@@ -309,5 +310,4 @@ mod test {
 
         Ok(())
     }
-
 }
