@@ -1,26 +1,5 @@
 use crate::{cross_product::IteratorExt, RainRadarValues, TimeInformation};
 
-macro_rules! dbg_if {
-    ($if:expr, $($rest:expr),+) => {
-        {
-            if $if {
-                dbg!($($rest),*)
-            } else {
-                ($($rest),+)
-            }
-        }
-    };
-    ($if:expr, $rest:expr$(,)?) => {
-        {
-            if $if {
-                dbg!($rest)
-            } else {
-                $rest
-            }
-        }
-    };
-}
-
 mod aligned_alloc {
     // from https://stackoverflow.com/a/69544158/4674154
     use std::alloc::*;

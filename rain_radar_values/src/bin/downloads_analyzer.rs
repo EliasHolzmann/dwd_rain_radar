@@ -25,21 +25,32 @@ fn main() -> Result<()> {
         .context("Failed reading environment variable DWD_DOWNLOADER_TARGET_DIRECTORY")?
         .into();
 
-    let files = std::fs::read_dir(target_directory)
-        .context("Could not read directory")?
-        .flat_map(|directory| -> std::fs::ReadDir {
-            std::fs::read_dir(directory.expect("Could not read directory").path())
+    let files = std::fs::read_dir(&target_directory)
+        .expect("Could not read directory")
+        .flat_map(|directory| {
+            let directory = directory.expect("Could not read directory");
+            std::fs::read_dir(directory.path())
                 .expect("Could not read directory")
+                .map(move |subdirectory| {
+                    (
+                        directory.file_name(),
+                        subdirectory.expect("Could not read directory").file_name(),
+                    )
+                })
         })
-        .map(|file| file.unwrap())
         .collect::<Vec<_>>();
 
     let result = files
         .par_iter()
-        .map(|file| {
-            let file_path = file.path();
-            let values = rain_radar_values::DWDRainRadarValues::from_file(file_path)
-                .unwrap_or_else(|err| panic!("Failed loading {file:?}: {err}"));
+        .map(|(sub_directory, file_name)| {
+            let file_path = target_directory.join(sub_directory).join(file_name);
+            let output_dir = target_directory
+                .join("bitmaps")
+                .join(sub_directory)
+                .join(file_name);
+            let values = rain_radar_values::DWDRainRadarValues::from_file(&file_path)
+                .unwrap_or_else(|err| panic!("Failed loading {file_path:?}: {err}"));
+            values.to_bmp(output_dir);
 
             values
                 .available_times()
@@ -56,21 +67,19 @@ fn main() -> Result<()> {
                         blocks_of_100_with_only_zero_values: 0,
                         blocks_of_100_with_values_greater_254: 0,
                     };
-                    for (index, value) in values.for_area(time, 0..1100, 0..1200).enumerate() {
-                        if let Some(value) = value {
-                            // increment both min and max: Two fields are only for reduce outside of this
-                            result.min_available_data_points += 1;
-                            result.max_available_data_points += 1;
-                            if value != 0 {
-                                result.min_rain_value_except_0 =
-                                    u16::min(value, result.min_rain_value_except_0);
-                                result.non_zero_values += 1;
-                            }
-                            if value > 255 {
-                                result.values_greater_255 += 1;
-                            }
-                            result.max_rain_value = u16::max(value, result.max_rain_value);
+                    for value in values.for_area(time, 0..1100, 0..1200).flatten() {
+                        // increment both min and max: Two fields are only for reduce outside of this
+                        result.min_available_data_points += 1;
+                        result.max_available_data_points += 1;
+                        if value != 0 {
+                            result.min_rain_value_except_0 =
+                                u16::min(value, result.min_rain_value_except_0);
+                            result.non_zero_values += 1;
                         }
+                        if value > 255 {
+                            result.values_greater_255 += 1;
+                        }
+                        result.max_rain_value = u16::max(value, result.max_rain_value);
                     }
                     for x in 0..11 {
                         for y in 0..12 {
@@ -91,13 +100,17 @@ fn main() -> Result<()> {
                             }
                         }
                     }
+                    dbg!();
                     result
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
         })
-        .collect::<Vec<_>>()
-        .iter_mut()
+        .collect::<Vec<_>>();
+
+    dbg!();
+    let result = result
+        .into_iter()
         .flatten()
         .reduce(|res1, res2| CheckerResults {
             min_available_data_points: u32::min(
