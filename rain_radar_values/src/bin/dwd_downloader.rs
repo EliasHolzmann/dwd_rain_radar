@@ -109,7 +109,6 @@ fn main() -> Result<()> {
                             .expect("may_currently_exit mutex is poisoned") = false;
 
                         let copy_result = response.copy_to(&mut file);
-                        std::thread::sleep(std::time::Duration::from_secs(3));
                         *may_currently_exit
                             .lock()
                             .expect("may_currently_exit mutex is poisoned") = true;

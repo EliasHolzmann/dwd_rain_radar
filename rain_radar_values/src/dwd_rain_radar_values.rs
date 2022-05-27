@@ -1,3 +1,5 @@
+use crate::cross_product::IteratorExt;
+
 use super::RainRadarValues;
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use chrono::prelude::*;
@@ -189,32 +191,13 @@ impl DWDRainRadarValues {
     }
 }
 
-pub struct TimeIterator<'a> {
-    radar_values: &'a DWDRainRadarValues,
-    current_index_iter: std::ops::Range<usize>,
-}
-
-impl<'a> std::iter::Iterator for TimeIterator<'a> {
-    type Item = NaiveDateTime;
-    fn next(&mut self) -> Option<NaiveDateTime> {
-        (&mut self.current_index_iter)
-            .map(|current_index| {
-                self.radar_values.base_time + chrono::Duration::minutes(current_index as i64 * 5)
-            })
-            .next()
-    }
-}
-
-pub struct Iterator<'a, X: std::iter::Iterator<Item = usize>, Y: std::iter::Iterator<Item = usize>>
-{
+pub struct Iterator<'a, X: super::Range, Y: super::Range> {
     radar_values: &'a DWDRainRadarValues,
     prediction_index: usize,
-    current_index_iter: std::iter::Zip<X, Y>,
+    current_index_iter: super::CrossProduct<X, Y>,
 }
 
-impl<'a, X: std::iter::Iterator<Item = usize>, Y: std::iter::Iterator<Item = usize>>
-    std::iter::Iterator for Iterator<'a, X, Y>
-{
+impl<'a, X: super::Range, Y: super::Range> std::iter::Iterator for Iterator<'a, X, Y> {
     type Item = Option<u16>;
     fn next(&mut self) -> Option<Option<u16>> {
         (&mut self.current_index_iter)
@@ -243,11 +226,9 @@ impl<'a, X: std::iter::Iterator<Item = usize>, Y: std::iter::Iterator<Item = usi
 }
 
 impl RainRadarValues for DWDRainRadarValues {
-    type Iter<'a, X: std::iter::Iterator<Item = usize>, Y: std::iter::Iterator<Item = usize>> =
-        Iterator<'a, X, Y>;
-    type TimeIter<'a> = TimeIterator<'a>;
+    type Iter<'a, X: super::Range, Y: super::Range> = Iterator<'a, X, Y>;
 
-    fn for_area<X: std::iter::Iterator<Item = usize>, Y: std::iter::Iterator<Item = usize>>(
+    fn for_area<X: super::Range, Y: super::Range>(
         &self,
         time: chrono::naive::NaiveDateTime,
         x: X,
@@ -266,14 +247,14 @@ impl RainRadarValues for DWDRainRadarValues {
         Iterator {
             radar_values: self,
             prediction_index,
-            current_index_iter: x.zip(y),
+            current_index_iter: x.cross_product(y),
         }
     }
 
-    fn available_times(&self) -> TimeIterator<'_> {
-        TimeIterator {
-            radar_values: self,
-            current_index_iter: (0..25),
+    fn time_information(&self) -> super::TimeInformation {
+        super::TimeInformation {
+            first_time: self.base_time,
+            available_time_slots: 25,
         }
     }
 }
@@ -294,16 +275,7 @@ mod test {
         assert_eq!(dwd_rain_radar_values.available_times().count(), 25);
 
         for time in dwd_rain_radar_values.available_times() {
-            let i1 = dwd_rain_radar_values.for_area(time, 0..5, 0..1200);
-            let i2 = dwd_rain_radar_values.for_area(time, 1095..1100, 0..1200);
-            let i3 = dwd_rain_radar_values.for_area(time, 0..1100, 0..5);
-            let i4 = dwd_rain_radar_values.for_area(time, 0..1100, 1095..1200);
-
-            for value in i1.chain(i2).chain(i3).chain(i4) {
-                assert!(value.is_none());
-            }
-
-            for _value in dwd_rain_radar_values.for_area(time, 0..1100, 0..1200) {
+            for _index in dwd_rain_radar_values.for_area(time, 0..1100, 0..1200) {
                 // Doing nothing with it. We just want to know whether iterating over all returns errors
             }
         }
