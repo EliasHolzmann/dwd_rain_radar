@@ -1,4 +1,4 @@
-use crate::cross_product::IteratorExt;
+use crate::CrossIteratorExt;
 
 use super::RainRadarValues;
 use anyhow::{anyhow, bail, ensure, Context, Result};
@@ -261,25 +261,26 @@ impl RainRadarValues for DWDRainRadarValues {
 
 #[cfg(test)]
 mod test {
+    use rayon::prelude::*;
+
     use super::*;
 
     #[test]
     fn test_file() -> Result<()> {
-        let dwd_rain_radar_values = DWDRainRadarValues::from_file(format!(
-            "{}/test_values/{}.tar.bz2",
-            std::env::var("CARGO_MANIFEST_DIR")
-                .context("Failed getting manifest dir env variable")?,
-            "valid"
-        ))?;
+        crate::local_file_analysis::selected_files()
+            .into_par_iter()
+            .map(|path| -> Result<()> {
+                let dwd_rain_radar_values = DWDRainRadarValues::from_file(path)?;
 
-        assert_eq!(dwd_rain_radar_values.available_times().count(), 25);
+                assert_eq!(dwd_rain_radar_values.available_times().count(), 25);
 
-        for time in dwd_rain_radar_values.available_times() {
-            for _index in dwd_rain_radar_values.for_area(time, 0..1100, 0..1200) {
-                // Doing nothing with it. We just want to know whether iterating over all returns errors
-            }
-        }
-
-        Ok(())
+                for time in dwd_rain_radar_values.available_times() {
+                    for _index in dwd_rain_radar_values.for_area(time, 0..1100, 0..1200) {
+                        // Doing nothing with it. We just want to know whether iterating over all returns errors
+                    }
+                }
+                Ok(())
+            })
+            .collect()
     }
 }

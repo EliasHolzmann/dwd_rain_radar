@@ -4,7 +4,7 @@ pub(crate) struct CrossProduct<T: Iterator + Clone, U: Iterator> {
     iter2: std::iter::Peekable<U>,
 }
 
-pub(crate) trait IteratorExt<T>: Iterator<Item = T> + Clone {
+pub(crate) trait CrossIteratorExt<T>: Iterator<Item = T> + Clone {
     fn cross_product<U: Iterator>(self, iter2: U) -> CrossProduct<Self, U> {
         CrossProduct {
             iter1_start: self.clone(),
@@ -14,7 +14,7 @@ pub(crate) trait IteratorExt<T>: Iterator<Item = T> + Clone {
     }
 }
 
-impl<T, I: Iterator<Item = T> + Clone> IteratorExt<T> for I {}
+impl<T, I: Iterator<Item = T> + Clone> CrossIteratorExt<T> for I {}
 
 impl<T: Iterator + Clone, U: Iterator> Iterator for CrossProduct<T, U>
 where

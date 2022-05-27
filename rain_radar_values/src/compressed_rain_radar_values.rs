@@ -1,4 +1,4 @@
-use crate::{cross_product::IteratorExt, RainRadarValues, TimeInformation};
+use crate::{CrossIteratorExt, RainRadarValues, TimeInformation};
 
 mod aligned_alloc {
     // from https://stackoverflow.com/a/69544158/4674154
@@ -147,9 +147,12 @@ impl CompressedRainRadarValues {
         }
     }
 
-    #[cfg(test)]
     fn reader(&self) -> impl std::io::Read + '_ {
         std::io::Cursor::new(&self.data)
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 }
 
@@ -237,55 +240,57 @@ impl RainRadarValues for CompressedRainRadarValues {
 
 #[cfg(test)]
 mod test {
-    use anyhow::{Context, Result};
+    use anyhow::{anyhow, Context, Result};
+    use rayon::prelude::*;
 
     use super::*;
 
     #[test]
     fn test_file() -> Result<()> {
-        let dwd_rain_radar_values = crate::DWDRainRadarValues::from_file(format!(
-            "{}/test_values/{}.tar.bz2",
-            std::env::var("CARGO_MANIFEST_DIR")
-                .context("Failed getting manifest dir env variable")?,
-            "valid"
-        ))?;
+        crate::local_file_analysis::selected_files()
+            .into_par_iter()
+            .map(|path| -> Result<()> {
+                let dwd_rain_radar_values = crate::DWDRainRadarValues::from_file(path)
+                    .with_context(|| anyhow!("Opening {path:?} failes"))?;
 
-        let compressed_rain_radar_values =
-            CompressedRainRadarValues::from_rain_radar_values(&dwd_rain_radar_values);
+                let compressed_rain_radar_values =
+                    CompressedRainRadarValues::from_rain_radar_values(&dwd_rain_radar_values);
 
-        dbg!(compressed_rain_radar_values.data.len());
+                dbg!(compressed_rain_radar_values.data.len());
 
-        std::io::copy(
-            &mut compressed_rain_radar_values.reader(),
-            &mut std::fs::File::create("/tmp/compressed_data").unwrap(),
-        )
-        .unwrap();
-
-        let compressed_times: Vec<chrono::NaiveDateTime> =
-            compressed_rain_radar_values.available_times().collect();
-        let dwd_times: Vec<chrono::NaiveDateTime> =
-            dwd_rain_radar_values.available_times().collect();
-
-        assert_eq!(compressed_times, dwd_times);
-
-        for time in compressed_times {
-            let mut dwd_rain_radar_values = dwd_rain_radar_values.for_area(time, 0..1100, 0..1200);
-            let mut compressed_rain_radar_values =
-                compressed_rain_radar_values.for_area(time, 0..1100, 0..1200);
-
-            for (index, (dwd_value, compressed_value)) in (&mut dwd_rain_radar_values)
-                .zip(&mut compressed_rain_radar_values)
-                .enumerate()
-            {
-                assert_eq!(
-                    dwd_value, compressed_value,
-                    "{dwd_value:?} != {compressed_value:?} (index {index}, time {time})"
+                std::io::copy(
+                    &mut compressed_rain_radar_values.reader(),
+                    &mut std::fs::File::create("/tmp/compressed_data").unwrap(),
                 )
-            }
-            assert!(dwd_rain_radar_values.next().is_none());
-            assert!(compressed_rain_radar_values.next().is_none());
-        }
+                .unwrap();
 
-        Ok(())
+                let compressed_times: Vec<chrono::NaiveDateTime> =
+                    compressed_rain_radar_values.available_times().collect();
+                let dwd_times: Vec<chrono::NaiveDateTime> =
+                    dwd_rain_radar_values.available_times().collect();
+
+                assert_eq!(compressed_times, dwd_times);
+
+                for time in compressed_times {
+                    let mut dwd_rain_radar_values =
+                        dwd_rain_radar_values.for_area(time, 0..1100, 0..1200);
+                    let mut compressed_rain_radar_values =
+                        compressed_rain_radar_values.for_area(time, 0..1100, 0..1200);
+
+                    for (index, (dwd_value, compressed_value)) in (&mut dwd_rain_radar_values)
+                        .zip(&mut compressed_rain_radar_values)
+                        .enumerate()
+                    {
+                        assert_eq!(
+                            dwd_value, compressed_value,
+                            "{dwd_value:?} != {compressed_value:?} (index {index}, time {time})"
+                        )
+                    }
+                    assert!(dwd_rain_radar_values.next().is_none());
+                    assert!(compressed_rain_radar_values.next().is_none());
+                }
+                Ok(())
+            })
+            .collect()
     }
 }

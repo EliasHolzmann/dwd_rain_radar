@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use anyhow::{Context, Result};
 use rain_radar_values::RainRadarValues;
 
 use rayon::prelude::*;
@@ -20,34 +19,19 @@ struct CheckerResults {
     blocks_of_100_with_values_greater_254: u32,
 }
 
-fn main() -> Result<()> {
+fn main() {
     let target_directory: std::path::PathBuf = std::env::var("DWD_DOWNLOADER_TARGET_DIRECTORY")
-        .context("Failed reading environment variable DWD_DOWNLOADER_TARGET_DIRECTORY")?
+        .expect("Environment variable DWD_DOWNLOADER_TARGET_DIRECTORY not set")
         .into();
 
-    let files = std::fs::read_dir(&target_directory)
-        .expect("Could not read directory")
-        .flat_map(|directory| {
-            let directory = directory.expect("Could not read directory");
-            std::fs::read_dir(directory.path())
-                .expect("Could not read directory")
-                .map(move |subdirectory| {
-                    (
-                        directory.file_name(),
-                        subdirectory.expect("Could not read directory").file_name(),
-                    )
-                })
-        })
-        .collect::<Vec<_>>();
-
-    let result = files
-        .par_iter()
-        .map(|(sub_directory, file_name)| {
-            let file_path = target_directory.join(sub_directory).join(file_name);
-            let output_dir = target_directory
-                .join("bitmaps")
-                .join(sub_directory)
-                .join(file_name);
+    let result = rain_radar_values::local_file_analysis::selected_files()
+        .into_par_iter()
+        .map(|file_path| {
+            let output_dir = target_directory.join("bitmaps").join(
+                file_path
+                    .strip_prefix(&target_directory)
+                    .expect("Failed stripping prefix"),
+            );
             let values = rain_radar_values::DWDRainRadarValues::from_file(&file_path)
                 .unwrap_or_else(|err| panic!("Failed loading {file_path:?}: {err}"));
             values.to_bmp(output_dir);
@@ -108,7 +92,6 @@ fn main() -> Result<()> {
         })
         .collect::<Vec<_>>();
 
-    dbg!();
     let result = result
         .into_iter()
         .flatten()
@@ -138,6 +121,4 @@ fn main() -> Result<()> {
                 + res2.blocks_of_100_with_values_greater_254,
         });
     println!("{result:#?}");
-
-    Ok(())
 }

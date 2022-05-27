@@ -11,5 +11,9 @@ pub use dwd_rain_radar_values::*;
 pub mod compressed_rain_radar_values;
 pub use compressed_rain_radar_values::*;
 
-pub mod cross_product;
-use cross_product::*;
+mod helpers;
+pub(crate) use helpers::*;
+
+// if local_file_analysis is enabled, make it public so that bins can use it too
+#[cfg(feature = "local_file_analysis")]
+pub use helpers::local_file_analysis;
