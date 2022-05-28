@@ -15,8 +15,8 @@ lazy_static = { version = "1.4.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 rayon = { version = "1", default-features = false, optional = true }
 reqwest = { version = "0.11.10", optional = true, default-features = false }
+rust-lzma = "0.5.1"
 tar = { version = "0.4.38", default-features = false }
-zstd = { version = "0.11.2", optional = true }
 
 [dev-dependencies]
 lazy_static = { version = "1.4.0" }
@@ -25,7 +25,7 @@ rand = { version = "0.8.5" }
 [features]
 dwd_downloader = [ "reqwest", "reqwest/blocking", "reqwest/default-tls" ]
 downloads_analyzer = [ "rayon", "local_file_analysis" ]
-dict_builder = [ "zstd", "rayon", "local_file_analysis" ]
+compress_test = [ "rayon", "local_file_analysis" ]
 local_file_analysis = [ "lazy_static", "rand" ]
 
 [[bin]]
@@ -37,5 +37,5 @@ name = "downloads_analyzer"
 required-features = [ "downloads_analyzer" ]
 
 [[bin]]
-name = "dict_builder"
-required-features = [ "dict_builder" ]
+name = "compress_test"
+required-features = [ "compress_test" ]
